@@ -1,0 +1,5 @@
+.stack-work/
+the-haskell-book.cabal
+*~
+*.lock
+*.pdf
