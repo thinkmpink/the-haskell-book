@@ -36,4 +36,14 @@ you can make any comments
 >
 > filterF :: (Applicative f, Foldable t, Monoid (f a))
 >         => (a -> Bool) -> t a -> f a
+
 > filterF f t = foldMap (\a -> if f a then pure a else mempty) t
+
+filterF f t = foldMap _ t
+
+
+
+
+
+
+hello
