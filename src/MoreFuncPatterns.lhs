@@ -394,3 +394,13 @@ show :: Show a => a -> String
 Write the following code into a source file. Then load it and run it in GHCi to make sure you understand why the evaluation results in the answers you see.
 
 (see arith4.hs)
+
+
+5. Next, write a pointfree version of roundTrip. (n.b., This refers to the function definition, not to its application in main.)
+
+(see arith4.hs)
+
+6. We will continue to use the code in module Arith4 for this exercise as well.
+When we apply show to a value such as (1 :: Int), the 𝑎 that implements Show is Int, so GHC will use the Int instance of the Show type class to stringify our Int of 1.
+However, read expects a String argument in order to return an 𝑎. The String argument that is the first argument to read tells the function nothing about what type the de-stringified result should be. In the type signature roundTrip currently has, it knows because the type variables are the same, so the type that is the input to show has to be the same type as the output of read.
+Your task now is to change the type of roundTrip in Arith4 to (Show a, Read b) => a -> b. How might we tell GHC which instance of Read to dispatch against the String now? Make the expression print (roundTrip 4) work. You will only need the `has the` type syntax of :: and parentheses for scoping.

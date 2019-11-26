@@ -142,3 +142,59 @@ dividedBy 15 2
 > multR a b
 >   | a == 1    = b
 >   | otherwise = b + multR (a-1) b
+
+Fixing dividedBy
+Our dividedBy function wasn’t quite ideal. For one thing, it was a partial function and doesn’t return a result (bottom) when given a divisor that is 0 or less.
+
+> data DividedByResult =
+>     Result Integer
+>   | DividedByZero
+>   deriving Show
+>
+> dividedBy' :: Integral a => a -> a -> (a, a)
+> dividedBy' num denom = go (abs num) (abs denom) 0
+>   where go n d count
+>          | n < d     = (count * inc, n)
+>          | otherwise = go (n - d) d (count + 1)
+>         inc = signum num * signum denom
+
+divMod
+n   d   ct   n
+10 (-4) ( 0, 10)
+ 6 (-4) (-1,  6) => (ct+(signum denom*signum num), _)
+ 2 (-4) (-2,  2)
+-2 (-4) (-3, -2)
+stop when abs n < abs d
+
+n + (abs d * (negate . signum $ n))
+n     d  ct   n
+(-10) 4 ( 0,-10)
+( -6) 4 (-1, -6)
+( -2) 4 (-2, -2)
+(  2) 4 (-3,  2)
+
+n     d  ct   n
+10    4  (0, 10)
+ 6    4  (1,  6)
+ 2    4  (2,  2)
+
+n     d  ct   n
+-10  -4  (0,-10)
+ -6  -4  (1, -6)
+ -2  -4  (2, -2)
+
+Still incorrect (not exact same output as quotRem), but moving on...
+
+
+McCarthy 91 function
+We’re going to describe a function in English, then in math notation, then show you what your function should return for some test inputs. Your task is to write the function in Haskell.
+The McCarthy 91 function yields 𝑥 − 10 when 𝑥 > 100 and 91 otherwise. The function is recursive.
+
+> mc91 :: (Ord b, Num b) => b -> b
+> mc91 n
+>  | n > 100   = n - 10
+>  | otherwise = mc91 . mc91 . (+11) $ n
+
+
+Numbers into words (see wordNumber.hs)
+Fill in the implementations of the functions above so that wordNumber returns the English word version of the Int value. You will first write a function that turns integers from 0-9 into their corresponding English words, ”one,” ”two,” and so on. Then you will write a function that takes the integer, separates the digits, and returns it as a list of integers. Finally you will need to apply the first function to the list produced by the second function and turn it into a single string with interspersed hyphens.
