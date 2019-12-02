@@ -391,8 +391,29 @@ rather than
 (a -> a -> Ordering) -> [a] -> a
 
 > myMaximumBy :: (a -> a -> Ordering) -> [a] -> a
-> myMaximumBy cmp = undefined
+> myMaximumBy cmp as = go (head as) as
+>   where go curMax (x:xs)
+>           | cmp curMax x == LT = go x xs
+>           | otherwise          = go curMax xs
+>         go curMax _            = curMax
 
      Prelude> xs = [1, 53, 9001, 10]
      Prelude> myMaximumBy compare xs
      9001
+
+9. myMinimumBy takes a comparison function and a list and returns the least element of the list based on the last value that the comparison returned LT for.
+
+> myMinimumBy :: (a -> a -> Ordering) -> [a] -> a
+> myMinimumBy cmp = myMaximumBy (flip cmp)
+
+     Prelude> xs = [1, 53, 9001, 10]
+     Prelude> myMinimumBy compare xs
+     1
+
+10. Using the myMinimumBy and myMaximumBy functions, write your own versions of maximum and minimum. If you have GHC 7.10 or newer, you’ll see a type constructor that wants a Foldable instance in- stead of a list as has been the case for many functions so far.
+
+> myMaximum :: (Ord a) => [a] -> a
+> myMaximum = myMaximumBy compare
+
+> myMinimum :: (Ord a) => [a] -> a
+> myMinimum = myMinimumBy compare
