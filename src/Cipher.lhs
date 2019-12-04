@@ -26,10 +26,25 @@ You should include an unCaesar function that will decipher your text as well. In
 Should this type signature use Natural instead of Int??
 
 > rightShift :: CipherBounds -> Int -> Char -> Char
-> rightShift cb amt ch = fromZero $ shift $ toZero
->   where toZero     = ord ch - ord (lowerBound cb)
->         shift i    = (i+amt) `mod` (range cb)
->         fromZero z = chr $ z + ord (lowerBound cb)
+> rightShift cb amt ch =
+>   fromZero $ shift $ toZero cb ch
+>     where
+>       shift i    = (i+amt) `mod` (range cb)
+>       fromZero z = chr $ z + ord (lowerBound cb)
+
+> toZero :: CipherBounds -> Char -> Int
+> toZero cb ch = ord ch - ord (lowerBound cb)
 
 > caesar :: CipherBounds -> Int -> String -> String
 > caesar cb amt = map (rightShift cb amt)
+
+> newtype Keyword = Keyword String
+>   deriving (Eq, Show)
+
+> vigenere :: CipherBounds
+>          -> Keyword
+>          -> String
+>          -> String
+> vigenere cb (Keyword s) = zipWith rt (cycle s)
+>   where
+>     rt key pt = rightShift cb (toZero cb key) pt
