@@ -1042,6 +1042,7 @@ Where star (*) gives you capitalization of the letter you’re writing to your f
 
 > -- fill in the rest.
 > data DaPhone = DaPhone [Key]
+>   deriving (Show)
 >
 > newtype PhoneDigit = PhoneDigit Int
 >   deriving (Eq, Show, Ord, Enum)
@@ -1057,6 +1058,42 @@ Where star (*) gives you capitalization of the letter you’re writing to your f
 >   | Star String
 >   | Pound String
 >   deriving (Eq, Show)
+>
+> myPhone :: DaPhone
+> myPhone = DaPhone
+>   [ SingleKey (PhoneDigit 1)
+>   , NumAlphaKey (PhoneDigit 2) "ABC"
+>   , NumAlphaKey (PhoneDigit 3) "DEF"
+>   , NumAlphaKey (PhoneDigit 4) "GHI"
+>   , NumAlphaKey (PhoneDigit 5) "JKL"
+>   , NumAlphaKey (PhoneDigit 6) "MNO"
+>   , NumAlphaKey (PhoneDigit 7) "PQRS"
+>   , NumAlphaKey (PhoneDigit 8) "TUV"
+>   , NumAlphaKey (PhoneDigit 9) "WXYZ"
+>   , Star "^"
+>   , NumAlphaKey (PhoneDigit 0) "+ _"
+>   , Pound ".,"
+>   ]
+>
+> phoneDigit :: PhoneDigit -> Digit
+> phoneDigit (PhoneDigit d) = head $ show d
+>
+> keyDigit :: Key -> Digit
+> keyDigit (SingleKey p)     = phoneDigit p
+> keyDigit (NumAlphaKey p _) = phoneDigit p
+> keyDigit (Star _)          = '*'
+> keyDigit (Pound _)         = '#'
+>
+> keyChars :: Key -> String
+> keyChars (SingleKey p)     = [phoneDigit p]
+> keyChars (NumAlphaKey p s) = s ++ [phoneDigit p]
+> keyChars st@(Star s)       = s ++ [keyDigit st]
+> keyChars po@(Pound s)      = s ++ [keyDigit po]
+>
+> hasChar :: Key -> Char -> Bool
+> hasChar k c = elem (toUpper c) $ keyChars k
+>
+
 
 2. Convert the following conversations into the keypresses required to express them. We’re going to suggest types and functions to fill in order to accomplish the goal, but they’re not obligatory. If you want to do it differently, go right ahead.
 
@@ -1083,7 +1120,13 @@ Where star (*) gives you capitalization of the letter you’re writing to your f
 > reverseTaps :: DaPhone
 >             -> Char
 >             -> [(Digit, Presses)]
-> reverseTaps (DaPhone keys) ch = undefined
+> reverseTaps d@(DaPhone keys) ch
+>   | isUpper ch = ('*', 1):reverseTaps d (toLower ch)
+>   | otherwise  = [(keyDigit key, numPresses key ch)]
+>   where
+>     key = head . filter (flip hasChar ch) $ keys
+>     numPresses k c =
+>       maybe (-1) (+1) (elemIndex (toUpper c) $ keyChars k)
 >
 > -- assuming the default phone definition
 > -- 'a' -> [('2', 1)]
@@ -1092,4 +1135,49 @@ Where star (*) gives you capitalization of the letter you’re writing to your f
 > cellPhonesDead :: DaPhone
 >                -> String
 >                -> [(Digit, Presses)]
-> cellPhonesDead = undefined
+> cellPhonesDead p = concat . map (reverseTaps p)
+>
+
+The following represents the button presses required for the whole sample conversation provided.
+
+> convertConvo :: [[(Digit, Presses)]]
+> convertConvo = map (cellPhonesDead myPhone) convo
+
+3. How many times do digits need to be pressed for each message?
+
+> fingerTaps :: [(Digit, Presses)] -> Presses
+> fingerTaps = sum . map snd
+
+mp> map fingerTaps convertConvo
+[53,5,19,77,16,54,65,16,65]
+
+4. What was the most popular letter for each message? What was its cost? You’ll want to combine reverseTaps and fingerTaps to figure out what it cost in taps. reverseTaps is a list because you need to press a different button in order to get capitals.
+
+> mostPopular :: Eq a => [a] -> a
+> mostPopular =
+>     head
+>   . maximumBy (\a b -> compare (length a) (length b))
+>   . group
+>
+> mostPopularLetter :: String -> Char
+> mostPopularLetter = mostPopular
+>
+> cost :: String -> Presses
+> cost s = fingerTaps
+>        . cellPhonesDead myPhone
+>        . filter (==m) $ s
+>   where m = mostPopularLetter s
+
+mp> map cost convo
+[6,1,2,9,1,9,3,1,4]
+
+5. What was the most popular letter overall? What was the most popular word?
+
+> coolestLtr :: [String] -> Char
+> coolestLtr = mostPopularLetter . concat
+
+mp> coolestLtr convo
+'t'
+
+> coolestWord :: [String] -> String
+> coolestWord = mostPopular . concat . map words
