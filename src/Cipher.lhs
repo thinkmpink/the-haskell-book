@@ -48,3 +48,31 @@ Should this type signature use Natural instead of Int??
 > vigenere cb (Keyword s) = zipWith rt (cycle s)
 >   where
 >     rt key pt = rightShift cb (toZero cb key) pt
+>
+> promptForPlaintext :: IO String
+> promptForPlaintext = do
+>   putStrLn "Enter some text to encrypt: "
+>   getLine
+>
+> defaultLBounds :: CipherBounds
+> defaultLBounds = CipherBounds 'a' 'z'
+>
+> userCaesar9 :: IO String
+> userCaesar9 = promptForPlaintext >>=
+>     return
+>   . caesar defaultLBounds 9
+>   . map toLower
+>
+> promptForKey :: IO String
+> promptForKey = do
+>   putStrLn "Enter a key to encrypt with: "
+>   getLine
+>
+> userVigenere :: IO String
+> userVigenere = do
+>   k  <- promptForKey
+>   pt <- promptForPlaintext
+>   return $ vigenere
+>     defaultLBounds
+>     (Keyword k)
+>     (map toLower pt)
