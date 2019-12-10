@@ -1,2 +1,7 @@
+import qualified WordNumberTest
+import qualified Testing
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = do
+  WordNumberTest.main
+  Testing.main

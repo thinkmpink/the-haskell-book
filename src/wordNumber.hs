@@ -16,7 +16,7 @@ digitToWord 9 = "nine"
 digitToWord _ = "unknown"
 
 digits :: Int -> [Int]
-digits n = reverse $ go n
+digits n = reverse $ go $ abs n
   where go m
          | m < 10    = [m]
          | otherwise = (mod m 10):(go (div m 10))
