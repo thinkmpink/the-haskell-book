@@ -18,7 +18,7 @@ You should include an unCaesar function that will decipher your text as well. In
 > data CipherBounds = CipherBounds {
 >   lowerBound :: Char
 > , upperBound :: Char
-> }
+> } deriving (Eq, Show)
 
 > range :: CipherBounds -> Int
 > range cb = ord (upperBound cb) - ord (lowerBound cb) + 1
@@ -38,6 +38,9 @@ Should this type signature use Natural instead of Int??
 > caesar :: CipherBounds -> Int -> String -> String
 > caesar cb amt = map (rightShift cb amt)
 
+> unCaesar :: CipherBounds -> Int -> String -> String
+> unCaesar cb amt = map (rightShift cb $ negate amt)
+
 > newtype Keyword = Keyword String
 >   deriving (Eq, Show)
 
@@ -48,6 +51,14 @@ Should this type signature use Natural instead of Int??
 > vigenere cb (Keyword s) = zipWith rt (cycle s)
 >   where
 >     rt key pt = rightShift cb (toZero cb key) pt
+>
+> unVigenere :: CipherBounds
+>            -> Keyword
+>            -> String
+>            -> String
+> unVigenere cb (Keyword s) = zipWith rt (cycle s)
+>   where
+>     rt key pt = rightShift cb (negate $ toZero cb key) pt  
 >
 > promptForPlaintext :: IO String
 > promptForPlaintext = do
