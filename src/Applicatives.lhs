@@ -143,7 +143,7 @@ Implement the list Applicative. Writing a minimally complete Applicative instanc
 >
 >   Nil <*> _   = Nil
 >   _   <*> Nil = Nil
->   xs  <*> ys  = flatMap (\a -> fmap ($ a) xs) ys
+>   Cons f fs <*> xs = append (f <$> xs) (fs <*> xs)
 
 > instance Arbitrary a
 >       => Arbitrary (List a) where
