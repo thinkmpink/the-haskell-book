@@ -399,4 +399,92 @@ Same as for Big.
 S
 This may be difficult. To make it easier, we’ll give you the constraints and QuickCheck instances:
 
-see SkiFree module
+see src/SkiFree.hs
+
+Instances for Tree
+This might be hard. Write the following instances for Tree.
+
+> data Tree a =
+>     Empty
+>   | Leaf a
+>   | Node (Tree a) a (Tree a)
+>   deriving (Eq, Show)
+
+> instance Functor Tree where
+>   fmap _ Empty    = Empty
+>   fmap f (Leaf a) = Leaf $ f a
+>   fmap f (Node t1 a t2) =
+>     Node (fmap f t1)
+>          (f a)
+>          (fmap f t2)
+
+> -- foldMap is a bit easier
+> -- and looks more natural,
+> -- but you can do foldr too
+> -- for extra credit.
+> instance Foldable Tree where
+
+>   foldMap _ Empty = mempty
+>   foldMap f (Leaf a) = f a
+>   foldMap f (Node x a y) =
+>        foldMap f x
+>     <> f a
+>     <> foldMap f y
+
+   foldr _ b Empty = b
+   foldr f b (Leaf a) = f a b
+   foldr f b (Node x a y) =
+     let fa     = f a
+         left   = foldr f b x
+         faLeft = fa left
+     in foldr f faLeft y
+
+
+> instance Traversable Tree where
+>   traverse _ Empty    = pure Empty
+>   traverse f (Leaf a) = Leaf <$> f a
+>   traverse f (Node x a y) =
+>         Node
+>     <$> traverse f x
+>     <*> f a
+>     <*> traverse f y
+
+> instance Arbitrary a
+>       => Arbitrary (Tree a) where
+>   arbitrary =
+>     fmap (takeDepth 12) $ frequency
+>       [ (1, pure Empty)
+>       , (1, Leaf <$> arbitrary)
+>       , (2, Node <$> arbitrary
+>                  <*> arbitrary
+>                  <*> arbitrary)
+>       ]
+
+> takeDepth :: Int -> Tree a -> Tree a
+> takeDepth _ Empty        = Empty
+> takeDepth _ (Leaf a)     = Leaf a
+> takeDepth 1 (Node _ a _) = Leaf a
+> takeDepth n (Node x a y) =
+>   Node (takeDepth (n - 1) x)
+>        a
+>        (takeDepth (n - 1) y)
+
+> instance Eq a
+>       => EqProp (Tree a) where
+>   xs =-= ys = xs' `eq` ys'
+>     where xs' = takeDepth 12 xs
+>           ys' = takeDepth 12 ys
+
+> instance Eq a
+>       => EqProp (Sum a) where
+>   (=-=) = eq
+
+> testTreeTraversable :: IO ()
+> testTreeTraversable = do
+>   let trigger :: Tree (Int, Int, Sum Int)
+>       trigger = undefined
+>       trigger2 :: Tree (Int, Int, Sum Int, Int, Int)
+>       trigger2 = undefined
+>   quickBatch (functor trigger)
+>   quickBatch (foldable trigger2)
+>   quickBatch (traversable trigger)
