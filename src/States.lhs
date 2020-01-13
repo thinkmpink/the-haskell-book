@@ -73,3 +73,45 @@ Write the Monad instance for State
 >   quickBatch (functor trigger)
 >   quickBatch (applicative trigger)
 >   quickBatch (monad trigger)
+
+Fizzbuzz Differently
+It’s an exercise! Rather than changing the underlying data structure, fix our reversing fizzbuzz by changing the code in the following way:
+
+fizzbuzzFromTo :: Integer
+               -> Integer
+               -> [String]
+fizzbuzzFromTo = undefined
+
+see fizzBuzz.hs
+
+Chapter Exercises
+
+23.8 Chapter exercises
+Write the following functions. You’ll want to use your own State type for which you’ve defined the Functor, Applicative, and Monad.
+
+I'm going to reuse the Moi type.
+
+1. Construct a State where the state is also the value you return.
+
+> get :: Moi s s
+> get = Moi $ \s -> (s, s)
+
+2. Construct a State where the resulting state is the argument provided and the value is defaulted to unit.
+
+> put :: s -> Moi s ()
+> put s = Moi $ \_ -> ((), s)
+
+3. Run the State with 𝑠 and get the state that results.
+
+> exec :: Moi s a -> s -> s
+> exec (Moi sa) = snd . sa
+
+4. Run the State with s and get the value that results.
+
+> eval :: Moi s a -> s -> a
+> eval (Moi sa) = fst . sa
+
+5. Write a function which applies a function to create a new State.
+
+> modify :: (s -> s) -> Moi s ()
+> modify f = Moi $ \s -> ((), f s)
