@@ -26,6 +26,8 @@ dependencies:
 - time
 - hspec
 - checkers
+- trifecta
+- raw-strings-qq
 
 library:
   source-dirs: src
