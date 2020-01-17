@@ -55,3 +55,17 @@ Failure (interactive):1:4: error: expected: digit,
 
 > parseIntegerEOF :: TokenParsing m => m Integer
 > parseIntegerEOF = integer <* eof
+
+Exercise: Try Try
+Make a parser, using the existing fraction parser plus a new decimal parser, that can parse either decimals or fractions. You’ll want to use <|> from Alternative to combine the...alternative parsers. If you find this too difficult, write a parser that parses straightforward integers or fractions. Make a datatype that contains either an integer or a rational and use that datatype as the result of the parser. Or use Either. Run free, grasshopper.
+Hint: we’ve not explained it yet, but you may want to try try.
+
+see parsingFractions.hs
+
+
+Lexers and Parsers
+
+> p' :: Parser [Integer]
+> p' = some $ do
+>   i <- token (some digit)
+>   return (read i)

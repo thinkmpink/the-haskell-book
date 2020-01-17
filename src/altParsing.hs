@@ -15,6 +15,8 @@ c = "123blah789"
 
 parseNos :: Parser NumberOrString
 parseNos =
+  skipMany (oneOf "\n")
+  >>
       (Left <$> integer)
   <|> (Right <$> some letter)
 
@@ -23,8 +25,7 @@ eitherOr = [r|
 123
 abc
 456
-def
-|]
+def|]
 
 main = do
   let p f i =
@@ -39,4 +40,6 @@ main = do
   print $ p (many parseNos) c
   print $ p (some parseNos) c
 
-  print $ p (many parseNos) eitherOr
+  print $ p (some parseNos) eitherOr
+
+data MyName = MyName String deriving Show

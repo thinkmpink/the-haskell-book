@@ -20,14 +20,26 @@ parseFraction = do
     0 -> fail "Denominator cannot be zero"
     _ -> return (numerator % denominator)
 
+parseDecimalOrFrac :: Parser (Either Rational Integer)
+parseDecimalOrFrac =
+      try (Left <$> parseFraction)
+  <|> Right <$> decimal
+
 main :: IO ()
 main = do
 
   let parseFraction' =
         parseString parseFraction mempty
+      parseDorF =
+        parseString parseDecimalOrFrac mempty
 
   print $ parseFraction' shouldWork
   print $ parseFraction' shouldAlsoWork
 
   print $ parseFraction' alsoBad
   print $ parseFraction' badFraction
+
+  -- from Exercise: Try Try
+  print $ parseDorF shouldWork
+  let shouldWorkNow = alsoBad
+  print $ parseDorF shouldWorkNow

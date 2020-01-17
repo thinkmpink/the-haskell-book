@@ -20,14 +20,19 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/thinkmpink/the-haskell-book#readme>
 
 dependencies:
+- attoparsec
 - base >= 4.7 && < 5
-- random
-- transformers
-- time
-- hspec
+- bytestring
 - checkers
-- trifecta
+- containers
+- hspec
+- parsec
+- random
 - raw-strings-qq
+- text
+- time
+- transformers
+- trifecta
 
 library:
   source-dirs: src
