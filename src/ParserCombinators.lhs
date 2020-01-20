@@ -4,6 +4,9 @@ Chapter 24. Parser combinators
 
 > module ParserCombinators where
 >
+> import Data.Char (digitToInt)
+> import Control.Applicative
+> import Text.Read (readMaybe)
 > import Text.Trifecta
 
 Exercises: Parsing Practice
@@ -69,3 +72,157 @@ Lexers and Parsers
 > p' = some $ do
 >   i <- token (some digit)
 >   return (read i)
+
+
+Chapter Exercises
+
+1. Write a parser for semantic versions as defined by http://semver.org/. After making a working parser, write an Ord instance for the SemVer type that obeys the specification outlined on the SemVer website.
+
+> data NumberOrString =
+>          NOSS String
+>        | NOSI Integer
+>       deriving (Eq, Show)
+>
+> instance Ord NumberOrString where
+>   compare (NOSS a) (NOSS b) = compare a b
+>   compare (NOSI i) (NOSI j) = compare i j
+>   compare (NOSS _) (NOSI _) = GT
+>   compare (NOSI _) (NOSS _) = LT
+>
+> type Major = Integer
+> type Minor = Integer
+> type Patch = Integer
+> type Release = [NumberOrString]
+> type Metadata = [NumberOrString]
+>
+> data SemVer =
+>   SemVer Major Minor Patch Release Metadata
+>   deriving (Show, Eq)
+>
+> instance Ord SemVer where
+>   compare (SemVer maj1 min1 pat1 rel1 _)
+>           (SemVer maj2 min2 pat2 rel2 _)
+>     | maj1 < maj2                    = LT
+>     | maj1 > maj2                    = GT
+>     | min1 < min2                    = LT
+>     | min1 > min2                    = GT
+>     | pat1 < pat2                    = LT
+>     | pat1 > pat2                    = GT
+>     | null rel1 && null rel2         = EQ
+>     | null rel1 && (not $ null rel2) = GT
+>     | (not $ null rel1) && null rel2 = LT
+>     | otherwise       = compare rel1 rel2
+>
+> -- Applicative version of parseSemVer
+> -- TODO: remove use of option
+> parseSemVer' :: Parser SemVer
+> parseSemVer' =
+>   SemVer <$> integer
+>          <* char '.'
+>          <*> integer
+>          <* char '.'
+>          <*> integer
+>          <*> option [] (char '-' *> parseRelease)
+>          <*> option [] (char '+' *> parseMetadata)
+>
+> parseSemVer :: Parser SemVer
+> parseSemVer = do
+>   major <- integer
+>   _     <- char '.'
+>   minor <- integer
+>   _     <- char '.'
+>   patch <- integer
+>
+>   release  <- option [] (char '-' *> parseRelease)
+>   metadata <- option [] (char '+' *> parseMetadata)
+>   return (SemVer major minor patch release metadata)
+>
+> parseRelease :: Parser Release
+> parseRelease = sepBy parseNumOrString (char '.')
+>
+> parseMetadata :: Parser Metadata
+> parseMetadata = sepBy parseNumOrString (char '.')
+>
+> parseNumOrString :: Parser NumberOrString
+> parseNumOrString = do
+>   chars <- some $ token alphaNum
+>   return $ case readMaybe chars of
+>     Nothing -> NOSS chars
+>     Just n  -> NOSI n
+
+2. Write a parser for positive integer values. Don’t reuse the pre-existing digit or integer functions, but you can use the rest of the libraries we’ve shown you so far. You are not expected to write a parsing library from scratch.
+
+> parseDigit :: Parser Char
+> parseDigit = oneOf ['0'..'9']
+>          <?> "One of ['0',...,'9']"
+
+> base10Integer :: Parser Integer
+> base10Integer = (snd . toInt)
+>             <$> some parseDigit
+>   where
+>     toInt =
+>       foldr
+>         (\d (tens, n) ->
+>           let new   = fromIntegral $ digitToInt d
+>               n'    = new * tens + n
+>               tens' = tens * 10
+>           in (tens', n'))
+>         (1, 0)
+
+3. Extend the parser you wrote to handle negative and positive integers. Try writing a new parser in terms of the one you already have to do this.
+
+> base10Integer' :: Parser Integer
+> base10Integer' =
+>       char '-' *> pure negate <*> base10Integer
+>   <|> base10Integer
+
+4. Write a parser for US/Canada phone numbers with varying formats.
+
+> -- aka area code
+> type NumberingPlanArea = Int
+> type Exchange = Int
+> type LineNumber = Int
+
+> data PhoneNumber =
+>   PhoneNumber NumberingPlanArea
+>               Exchange LineNumber
+>   deriving (Eq, Show)
+
+> parsePhone :: Parser PhoneNumber
+> parsePhone =
+>       try parseHyphenFmtNoCountry
+>   <|> try parseNoPuncFmt
+>   <|> try parseHyphenFmtCountry
+>   <|> parseParenFmt
+>   where
+>     parseHyphenFmtNoCountry =
+>       PhoneNumber <$> parseNumPlanArea
+>                   <* char '-'
+>                   <*> parseExchange
+>                   <* char '-'
+>                   <*> parseLineNum
+>
+>     parseNoPuncFmt =
+>       PhoneNumber <$> parseNumPlanArea
+>                   <*> parseExchange
+>                   <*> parseLineNum
+>
+>     parseParenFmt =
+>       PhoneNumber <$ char '('
+>                   <*> parseNumPlanArea
+>                   <* char ')' <* char ' '
+>                   <*> parseExchange
+>                   <* char '-'
+>                   <*> parseLineNum
+>
+>     parseHyphenFmtCountry =
+>       PhoneNumber <$  string "1-"
+>                   <*> parseNumPlanArea
+>                   <*  char '-'
+>                   <*> parseExchange
+>                   <* char '-'
+>                   <*> parseLineNum
+>
+>     parseNumPlanArea = read <$> count 3 digit
+>     parseExchange = read <$> count 3 digit
+>     parseLineNum = read <$> count 4 digit

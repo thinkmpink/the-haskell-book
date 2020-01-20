@@ -53,3 +53,10 @@ main = do
   -- attoparsec
   attoP nobackParse "13"
   attoP tryParse "13"
+
+tryAnnot :: (Monad f, CharParsing f)
+         => f Char
+tryAnnot =
+      (try (char '1' >> char '2')
+      <?> "Tried 12")
+  <|> (char '3' <?> "Tried 3")
