@@ -32,7 +32,7 @@ dependencies:
 - raw-strings-qq
 - scientific
 - text
-- time
+- time >= 1.9
 - transformers
 - trifecta
 

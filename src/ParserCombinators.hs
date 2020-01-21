@@ -8,6 +8,8 @@ module ParserCombinators where
 
 import Control.Applicative
 import Data.Char (digitToInt)
+import qualified Data.List as L
+import qualified Data.Map as M
 import Data.Ratio
 import Data.Time
 import Text.RawString.QQ
@@ -275,23 +277,46 @@ logEx2 = [r|
 
 newtype ActivityName =
   ActivityName String
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Activity =
-  Activity LocalTime ActivityName
-  deriving Show
+  Activity  {
+    activityTime :: LocalTime
+  , activityName :: ActivityName
+  } deriving Show
 
 instance Eq Activity where
   Activity _ n1 == Activity _ n2 =
     n1 == n2
 
+-- assumes input sorted by time
 totalTime :: [Activity]
-          -> [(Activity, Integer)]
-totalTime = undefined
+          -> M.Map ActivityName NominalDiffTime
+totalTime (Activity t1 n1 : Activity t2 n2 : as) =
+  M.insertWith (+) n1 (diffLocalTime t2 t1) $
+    totalTime (Activity t2 n2 : as)
+totalTime (Activity t n : []) =
+  M.insertWith (+) n 0 $ totalTime []
+totalTime [] = M.empty
 
 averageTime :: [Activity]
-            -> [(Activity, Rational)]
-averageTime = undefined
+            -> M.Map ActivityName NominalDiffTime
+averageTime as =
+  let totals   = totalTime as
+      divisors = M.fromList $
+        (,) <$> activityName . head
+            <*> length
+            <$> (L.group $ L.sortOn activityName as)
+
+  in M.intersectionWith divBy totals divisors
+
+divBy :: NominalDiffTime
+      -> Int
+      -> NominalDiffTime
+divBy ndt i =
+    fromRational
+  . flip (/) (fromIntegral i)
+  . toRational $ ndt
 
 parseLocalTime :: Day -> Parser LocalTime
 parseLocalTime day =
@@ -331,7 +356,7 @@ parseActivityName =
   where
     notEndCand = some (noneOf "\n- \t")
     notComment = string "-" <* notFollowedBy (char '-')
-    notSpBeforeComment = 
+    notSpBeforeComment =
       some (oneOf " \t") <* notFollowedBy (string "--")
     validStr   = try notComment
              <|> try notSpBeforeComment
@@ -367,6 +392,4 @@ parseLog =
     surroundedBy parseDayActivities $
       many parseCommentOrEOL
 
--- TODO: spaces still messing up the parseLog
--- TODO: impl aggregates
 -- TODO: impl generation, QuickCheck
