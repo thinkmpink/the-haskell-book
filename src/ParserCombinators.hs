@@ -473,7 +473,7 @@ parseIPv6Address =
 
 parseAllQuibbles :: Parser [Word16]
 parseAllQuibbles = do
-  startQuib <- parseNonCollapsedQuibbles
+  startQuib <- option [] parseNonCollapsedQuibbles
   let done = length startQuib
   endQuib <- if done < 8
              then string "::" *>
