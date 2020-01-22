@@ -7,11 +7,15 @@
 module ParserCombinators where
 
 import Control.Applicative
-import Data.Char (digitToInt)
+import Data.Bits
+import Data.Char (digitToInt, isHexDigit, ord)
 import qualified Data.List as L
 import qualified Data.Map as M
+import Data.Maybe
 import Data.Ratio
+import Data.Word
 import Data.Time
+import Test.Hspec
 import Text.RawString.QQ
 import Text.Read (readMaybe)
 import Text.Trifecta
@@ -393,3 +397,215 @@ parseLog =
       many parseCommentOrEOL
 
 -- TODO: impl generation, QuickCheck
+
+-- 6. Write a parser for IPv4 addresses.
+
+data IPAddress =
+  IPAddress Word32
+  deriving (Eq, Show)
+
+parseIPv4Address :: Parser IPAddress
+parseIPv4Address = fmap IPAddress $
+      packQuads
+  <$> parseIPv4Quad <* char '.'
+  <*> parseIPv4Quad <* char '.'
+  <*> parseIPv4Quad <* char '.'
+  <*> parseIPv4Quad
+
+packQuads :: Word8 -> Word8 -> Word8 -> Word8
+          -> Word32
+packQuads a b c d =
+  let a' = shiftL (fromIntegral a) 24
+      b' = shiftL (fromIntegral b) 16
+      c' = shiftL (fromIntegral c)  8
+      d' =        (fromIntegral d)
+  in a' .|. b' .|. c' .|. d'
+
+parseIPv4Quad :: Parser Word8
+parseIPv4Quad = do
+  i <- integer
+  let maxB = fromIntegral (maxBound :: Word8)
+             :: Integer
+      minB = fromIntegral (minBound :: Word8)
+             :: Integer
+  if i <= maxB && i >= minB
+  then return $ fromIntegral i
+  else fail $ "Value " <> show i <>
+              " is out of bounds "
+              <> show (minB, maxB)
+
+-- 7. Same as before, but IPv6.
+
+data IPAddress6 =
+  IPAddress6 Word64 Word64
+  deriving (Eq, Ord, Show)
+
+showIPv6Decimal :: IPAddress6 -> String
+showIPv6Decimal (IPAddress6 a b) =
+  let a' = shiftL (fromIntegral a :: Integer) 64
+      b' =         fromIntegral b :: Integer
+  in show $ a' .|. b'
+
+inRange :: Int -> Int -> Parser a -> Parser [a]
+inRange lo hi p
+  | hi < lo = fail "Impossible to satisfy \
+                   \requested number of parses."
+  | otherwise = (<>)
+      <$> count lo p
+      <*> (catMaybes <$> count (hi - lo)
+                               (optional p))
+
+packWord64 :: [Word16] -> Word64
+packWord64 (a : b : c : d : _) =
+  let a' = shiftL (fromIntegral a) 48
+      b' = shiftL (fromIntegral b) 32
+      c' = shiftL (fromIntegral c) 16
+      d' =         fromIntegral d
+  in a' .|. b' .|. c' .|. d'
+packWord64 _ = 0
+
+parseIPv6Address :: Parser IPAddress6
+parseIPv6Address =
+  IPAddress6
+  <$> packWord64 . take 4
+  <*> packWord64 . drop 4
+  <$> parseAllQuibbles
+
+parseAllQuibbles :: Parser [Word16]
+parseAllQuibbles = do
+  startQuib <- parseNonCollapsedQuibbles
+  let done = length startQuib
+  endQuib <- if done < 8
+             then string "::" *>
+                  parseNonCollapsedQuibbles
+             else pure []
+  return $ fillInZeros startQuib endQuib
+
+  where
+    fillInZeros s e =
+      s <>
+      (take (8 - length s - length e) (repeat 0))
+        <> e
+
+parseNonCollapsedQuibbles :: Parser [Word16]
+parseNonCollapsedQuibbles =
+  (:) <$> parseQuibble
+      <*> many (try delim *> parseQuibble)
+  where
+    delim = char ':' <* notFollowedBy (char ':')
+  -- sepBy parseQuibble $ char ':'
+
+parseQuibble :: Parser Word16
+parseQuibble =
+    packHex
+  . map (maybe 0 id)
+  . map digitToHex
+  . padL '0' 4
+  <$> inRange 1 4 hexDigit
+  where
+    padL p maxCt xs =
+      replicate (maxCt - length xs) p <> xs
+
+packHex :: [Word8]
+        -> Word16
+packHex (a : b : c : d : _) =
+  let a' = cleanAndShift 12 a
+      b' = cleanAndShift  8 b
+      c' = cleanAndShift  4 c
+      d' = fromIntegral $ maskHex d
+      cleanAndShift i val =
+        flip shiftL i . fromIntegral . maskHex $ val
+      maskHex h = 15 .&. h
+  in a' .|. b' .|. c' .|. d'
+packHex _ = 0
+
+type Hex = Word8 -- use only first 4 bits
+
+charToHex :: Char -> Maybe Hex
+charToHex c
+  | (fromIntegral dec::Word) <= 9 =
+      Just . fromIntegral $ dec
+  | (fromIntegral hexl::Word) <= 5 =
+      Just . fromIntegral $ hexl + 10
+  | (fromIntegral hexu::Word) <= 5 =
+      Just . fromIntegral $ hexu + 10
+  | otherwise = Nothing
+  where
+    dec = ord c - ord '0'
+    hexl = ord c - ord 'a'
+    hexu = ord c - ord 'A'
+
+digitToHex :: Char -> Maybe Hex
+digitToHex c
+  | isHexDigit c = charToHex c
+  | otherwise    = Nothing
+
+resultToEither :: Result a -> Either String a
+resultToEither (Success a) = Right a
+resultToEither (Failure b) = Left $ show b
+
+testIPv6AddressParser :: IO ()
+testIPv6AddressParser = hspec $ do
+  let ipv6 s = resultToEither $
+               showIPv6Decimal
+           <$> parseString parseIPv6Address mempty s
+      pq s   = resultToEither $
+               parseString parseQuibble mempty s
+  describe "charToHex" $ do
+    it "acts as identity on a decimal digit" $ do
+      charToHex '5' `shouldBe` Just 5
+    it "acts as identity on all decimal digits" $ do
+      catMaybes (map charToHex "0123456789")
+      `shouldBe` [0..9]
+    it "maps lowercase hex correctly" $ do
+      catMaybes (map charToHex "abcdef")
+      `shouldBe` [10..15]
+    it "maps uppercase hex correctly" $ do
+      catMaybes (map charToHex "ABCDEF")
+      `shouldBe` [10..15]
+  describe "Pack Hex" $ do
+    it "maps [15, 15, 15, 15] to 65535" $ do
+      packHex [15, 15, 15, 15]
+      `shouldBe` 65535
+    it "maps [0, 0, 0, 15] to 15" $ do
+      packHex [0, 0, 0, 15]
+      `shouldBe` 15
+  describe "inRange parser combinator" $ do
+    it "parses at least the bottom range" $ do
+      resultToEither
+        (parseString (inRange 1 4 hexDigit) mempty "f")
+        `shouldBe` Right "f"
+  describe "Quibble (hexadectet) parser" $ do
+    it "maps full zero to zero" $ do
+      pq "0000" `shouldBe` Right 0
+    it "maps truncated zero to zero" $ do
+      pq "0" `shouldBe` Right 0
+    it "maps ffff to 65535" $ do
+      pq "ffff" `shouldBe` Right 65535
+    it "maps f to 15" $ do
+      pq "f" `shouldBe` Right 15
+  describe "IPv6 address parser" $ do
+    it "parses lowercase, lead-zero trimmed\
+       \ strings where trimmed quibbles are zero" $ do
+      ipv6 "0:0:0:0:0:ffff:ac10:fe01"
+      `shouldBe` Right "281473568538113"
+    it "parses lowercase, lead-zero trimmed\
+       \ strings for nonzero trimmed quibbles" $ do
+      ipv6 "0:0:0:0:0:ffff:cc78:f"
+      `shouldBe` Right "281474112159759"
+    it "parses uppercase strings" $ do
+      ipv6 "FE80:0000:0000:0000:0202:B3FF:FE1E:8329"
+      `shouldBe`
+      Right "338288524927261089654163772891438416681"
+    it "parses 2-zero address collapsed\
+       \ after 2 quibbles" $ do
+      ipv6 "2001:DB8::8:800:200C:417A"
+      `shouldBe`
+      Right "42540766411282592856906245548098208122"
+    it "parses 3-zero address collapsed\
+       \ after 1 quibble" $ do
+      ipv6 "FE80::0202:B3FF:FE1E:8329"
+      `shouldBe`
+      Right "338288524927261089654163772891438416681"
+    it "parses loopback address" $ do
+      ipv6 "::1" `shouldBe` Right "1"
