@@ -657,3 +657,18 @@ showCanonicalIPv4 (IPAddress w) =
 
 instance Show IPAddress where
   show = showCanonicalIPv4
+
+-- 9. Write a function that converts between IPAddress and IPAddress6.
+
+fromIP4ToIP6 :: IPAddress -> IPAddress6
+fromIP4ToIP6 (IPAddress w) =
+  IPAddress6 0 $ fromIntegral w
+
+fromIP6ToIP4 :: IPAddress6 -> Maybe IPAddress
+fromIP6ToIP4 (IPAddress6 a b)
+  | a > 0 = Nothing
+  | b > fromIntegral (maxBound :: Word32)
+          = Nothing
+  | otherwise = Just
+              . IPAddress
+              . fromIntegral $ b
