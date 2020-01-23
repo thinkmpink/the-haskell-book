@@ -8,7 +8,7 @@ module ParserCombinators where
 
 import Control.Applicative
 import Data.Bits
-import Data.Char (digitToInt, isHexDigit, ord)
+import Data.Char (digitToInt, isHexDigit, ord, chr)
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
@@ -402,7 +402,7 @@ parseLog =
 
 data IPAddress =
   IPAddress Word32
-  deriving (Eq, Show)
+  deriving (Eq)
 
 parseIPv4Address :: Parser IPAddress
 parseIPv4Address = fmap IPAddress $
@@ -438,7 +438,7 @@ parseIPv4Quad = do
 
 data IPAddress6 =
   IPAddress6 Word64 Word64
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
 
 showIPv6Decimal :: IPAddress6 -> String
 showIPv6Decimal (IPAddress6 a b) =
@@ -609,3 +609,51 @@ testIPv6AddressParser = hspec $ do
       Right "338288524927261089654163772891438416681"
     it "parses loopback address" $ do
       ipv6 "::1" `shouldBe` Right "1"
+
+-- 8. Remove the derived Show instances from the IPAddress/IPAddress6 types, and write your own Show instance for each type that renders in the typical textual format appropriate to each.
+
+fromHexW8 :: Word8 -> Char
+fromHexW8 w
+  | w <= 9  = from (+ ord '0') w
+  | w <= 15 = from ((+ (-10)) . (+ ord 'a')) w
+  | otherwise = from id w
+  where
+    from f x = chr . f . fromIntegral $ x
+
+showCanonicalIPv6 :: IPAddress6 -> String
+showCanonicalIPv6 (IPAddress6 hi lo) =
+  unpackWord64 hi <> ":" <> unpackWord64 lo
+  where
+    maskHex = (15 .&.)
+    toHexW8 h = maskHex (fromIntegral h :: Word8)
+    unpackWord64 w =
+      let allChars =
+            map (fromHexW8 . toHexW8 . shiftR w)
+                (take 16 . iterate (+ (-4)) $ 60)
+      in eachInsert 4 19 ':' allChars
+
+eachInsert :: (Foldable t, Integral a)
+           => a -> Int -> b -> t b -> [b]
+eachInsert n total c cs =
+  take total $ snd $
+  foldr (\x (count, xs) ->
+          (count + 1,
+           if count `mod` n == 0
+           then x:c:xs
+           else x:xs))
+        (0, []) cs
+
+instance Show IPAddress6 where
+  show = showCanonicalIPv6
+
+
+
+showCanonicalIPv4 :: IPAddress -> String
+showCanonicalIPv4 (IPAddress w) =
+  L.intercalate "." $
+    map (show . toW8 . shiftR w) [24, 16, 8, 0]
+  where
+    toW8 x = fromIntegral x :: Word8
+
+instance Show IPAddress where
+  show = showCanonicalIPv4
