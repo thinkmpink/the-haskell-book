@@ -1,0 +1,3 @@
+[submodule "haphviz"]
+	path = haphviz
+	url = https://github.com/NorfairKing/haphviz

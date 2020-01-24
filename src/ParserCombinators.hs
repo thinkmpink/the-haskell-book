@@ -9,16 +9,22 @@ module ParserCombinators where
 import Control.Applicative
 import Data.Bits
 import Data.Char (digitToInt, isHexDigit, ord, chr)
+import qualified Data.CharSet as CS
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Ratio
 import Data.Word
+import qualified Data.Scientific as Sci
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as Enc
 import Data.Time
 import Test.Hspec
+import qualified Text.Dot as Dot
 import Text.RawString.QQ
 import Text.Read (readMaybe)
 import Text.Trifecta
+import qualified Xeno.SAX
 
 -- Exercises: Parsing Practice
 
@@ -672,3 +678,212 @@ fromIP6ToIP4 (IPAddress6 a b)
   | otherwise = Just
               . IPAddress
               . fromIntegral $ b
+
+
+-- 10. Write a parser for the DOT language that Graphviz uses to express graphs in plain-text. We suggest you look at the AST datatype in Haphviz for ideas on how to represent the graph in a Haskell datatype. If you’re feeling especially robust, you can try using fgl.
+
+
+-- Okay, here goes nothing. I'm going to try to tokenize the language, then create the AST from the tokens.
+
+
+--
+-- data CompassPoint =
+--     North
+--   | NorthEast
+--   | East
+--   | SouthEast
+--   | South
+--   | SouthWest
+--   | West
+--   | NorthWest
+--   | Ccc
+--   | Underscore
+--   deriving (Eq, Show)
+--
+-- parseCompassPoint :: (TokenParsing m)
+--                   => m CompassPoint
+-- parseCompassPoint =
+--       North <$ NorthTok
+--   <|> NorthEast <$ NorthEastTok
+--   <|> East <$ EastTok
+--   <|> SouthEast <$ SouthEastTok
+--   <|> South <$ SouthTok
+--   <|> SouthWest <$ SouthWestTok
+--   <|> West <$ WestTok
+--   <|> NorthWest <$ NorthWestTok
+--   <|> Ccc <$ CTok
+--   <|> Underscore <$ UnderscoreTok
+--   <?> "Compass point"
+
+-- Not quite right.
+-- we can do better if we know what we are looking for
+testTokenizeSampleDot1 :: Result [Tok]
+testTokenizeSampleDot1 =
+  parseByteString parseToks mempty $
+    Enc.encodeUtf8 $
+    Dot.renderGraph sampleDot1
+
+sampleDot1 :: Dot.DotGraph
+sampleDot1 = Dot.graph Dot.directed "sampleDot1" $ do
+  a <- Dot.node "a"
+  b <- Dot.node "b"
+  a Dot.--> b
+  b Dot.--> a
+  b Dot.--> b
+
+parseToks :: (Monad m, TokenParsing m)
+          => m [Tok]
+parseToks = many (parseTok <* whiteSpace)
+
+data Tok =
+    Ter Terminal
+  | IDTok IDToken
+  | EdgeOpTok EdgeOpToken
+  deriving (Eq, Show)
+
+parseTok :: (Monad m, TokenParsing m)
+         => m Tok
+parseTok =
+      IDTok <$> parseIDToken
+  <|> EdgeOpTok <$> parseEdgeOp
+  <|> Ter <$> parseTerminal
+  <?> "Any token"
+
+data Terminal =
+    StrictTok
+  | GraphTok
+  | DigraphTok
+  | NodeTok
+  | EdgeTok
+  | SubgraphTok
+  | NorthTok
+  | NorthEastTok
+  | EastTok
+  | SouthEastTok
+  | SouthTok
+  | SouthWestTok
+  | WestTok
+  | NorthWestTok
+  | CTok
+  | UnderscoreTok
+  deriving (Eq, Show)
+
+parseTerminal :: TokenParsing m
+              => m Terminal
+parseTerminal =
+      StrictTok <$ textSymbol "strict"
+  <|> GraphTok <$ textSymbol "graph"
+  <|> DigraphTok <$ textSymbol "digraph"
+  <|> NodeTok <$ textSymbol "node"
+  <|> EdgeTok <$ textSymbol "edge"
+  <|> SubgraphTok <$ textSymbol "subgraph"
+  <|> NorthEastTok <$ textSymbol "ne"
+  <|> NorthWestTok <$ textSymbol "nw"
+  <|> NorthTok <$ textSymbol "n"
+  <|> EastTok <$ textSymbol "e"
+  <|> SouthEastTok <$ textSymbol "se"
+  <|> SouthWestTok <$ textSymbol "sw"
+  <|> SouthTok <$ textSymbol "s"
+  <|> WestTok <$ textSymbol "w"
+  <|> CTok <$ textSymbol "c"
+  <|> UnderscoreTok <$ textSymbol "_"
+  <?> "Terminal"
+
+data EdgeOpToken =
+    RightArrowTok
+  | UndirectedTok
+  deriving (Eq, Show)
+
+parseEdgeOp :: TokenParsing m
+            => m EdgeOpToken
+parseEdgeOp =
+      RightArrowTok <$ textSymbol "->"
+  <|> UndirectedTok <$ textSymbol "--"
+  <?> "Edge operator"
+
+data IDToken =
+    StrIDTok T.Text
+  | NumIDTok Sci.Scientific
+  | QuotedTok T.Text
+  | HTMLTok T.Text
+  deriving (Eq, Show)
+
+parseIDToken :: (Monad m, TokenParsing m)
+             => m IDToken
+parseIDToken =
+      StrIDTok <$> parseStrIDTok
+  <|> NumIDTok <$> scientific
+  <|> QuotedTok <$> stringLiteral
+  <|> HTMLTok <$> parseHTMLTok
+  <?> "ID token"
+
+-- Any string of alphabetic ([a-zA-Z\200-\377]) characters, underscores ('_') or digits ([0-9]), not beginning with a digit;
+parseStrIDTok :: TokenParsing m
+              => m T.Text
+parseStrIDTok =
+  let loSet        = CS.range 'a' 'z'
+      upSet        = CS.range 'A' 'Z'
+      twoHun377Set = CS.range '\200' '\377'
+      under        = CS.singleton '_'
+      digs         = CS.range '0' '9'
+      validFirstSet = loSet
+           `CS.union` upSet
+           `CS.union` twoHun377Set
+           `CS.union` under
+      validRestSet = validFirstSet
+           `CS.union` digs
+  in token $ (T.pack .) . (:)
+         <$> oneOfSet validFirstSet
+         <*> many (oneOfSet validRestSet)
+
+
+parseHTMLTok :: (Monad m, TokenParsing m)
+             => m T.Text
+parseHTMLTok = do
+  allXML <- parseXMLCandidate
+  let xmlByteString = Enc.encodeUtf8 allXML
+      isValid = Xeno.SAX.validate xmlByteString
+  if isValid
+  then return allXML
+  else fail $ "Invalid XML"
+
+parseXMLCandidate :: TokenParsing m
+                  => m T.Text
+parseXMLCandidate =
+  foldMap id <$> some (parseXMLTag <* whiteSpace)
+
+parseXMLTag :: TokenParsing m
+            => m T.Text
+parseXMLTag =
+    T.cons '<'
+  . flip T.snoc '>'
+  . T.pack
+  <$> angles (token $ many $ noneOf ">")
+
+
+
+
+-- data DotGraph =
+--   DotGraph {
+--     strict :: Bool
+--   , graph :: Graph
+--   , iden :: Maybe ID
+--   , statements :: [Statement]
+--   } deriving (Eq, Show)
+--
+-- data Graph =
+--     Node NodeID [Attribute]
+--   | Edge
+--   | Subgraph
+--   deriving (Eq, Show)
+--
+-- newtype ID =
+--   ID String
+--   deriving (Eq, Show)
+--
+-- data Statement =
+--     NodeStmt NodeStatement
+--   | EdgeStmt EdgeStatement
+--   | AttrStmt AttributeStatement
+--   | IDEquivalence IDPair
+--   | Sub SubG

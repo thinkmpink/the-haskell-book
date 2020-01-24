@@ -24,8 +24,10 @@ dependencies:
 - attoparsec
 - base >= 4.7 && < 5
 - bytestring
+- charset
 - checkers
 - containers
+- haphviz
 - hspec
 - parsec
 - random
@@ -35,6 +37,7 @@ dependencies:
 - time >= 1.9
 - transformers
 - trifecta
+- xeno
 
 library:
   source-dirs: src
