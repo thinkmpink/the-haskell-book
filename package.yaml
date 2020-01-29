@@ -33,6 +33,7 @@ dependencies:
 - random
 - raw-strings-qq
 - scientific
+- scotty
 - text
 - time >= 1.9
 - transformers
