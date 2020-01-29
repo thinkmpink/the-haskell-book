@@ -8,7 +8,6 @@ Chapter 26. Monad Transformers
 > import Control.Monad.IO.Class
 > import Control.Monad.Trans.Class
 > import Control.Monad.Trans.Except
-> import Control.Monad.Trans.Reader
 
 > newtype MaybeT m a =
 >   MaybeT { runMaybeT :: m (Maybe a) }

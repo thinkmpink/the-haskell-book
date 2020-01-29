@@ -112,3 +112,7 @@ doExcite = do
 8. Hit counter
 
 See hitCounter.hs
+
+9. Morra
+
+See Morra.hs
