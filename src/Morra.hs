@@ -165,18 +165,47 @@ introGame = do
          . explainRoles
          $ [r1, r2]
 
+reportScore :: Score -> String
+reportScore (r, s) =
+  (getName . playerToName . roleToPlayer $ r) <>
+  " scored " <> show s <> "points."
+
+congratulateWinner :: Role -> String
+congratulateWinner r =
+  "Congratulations! " <>
+  (getName . playerToName . roleToPlayer $ r) <>
+  " won."
+
+exitGame :: Game ()
+exitGame = do
+  ((r1, s1), (r2, s2)) <- get
+  liftIO $ do
+    putStrLn . reportScore $ (r1, s1)
+    putStrLn . reportScore $ (r2, s2)
+    putStrLn . congratulateWinner $
+      if s1 > s2
+      then r1
+      else r2
+
+
 playMorraGame :: Game ()
 playMorraGame = do
   introGame
   playG
+  exitGame
   where
     playG = do
       morraRound
       gameOver <- checkGameOver
       unless gameOver playG
 
-playMorra :: IO ()
-playMorra = do
+playMorra :: Option -> IO ()
+playMorra opt = do
   scores <- newGame
-  runStateT playMorraGame scores
-  return ()
+  fst <$> runStateT playMorraGame scores
+
+data Option =
+    TwoPeople
+  | RandComputer
+  -- | TrigramComputer
+  deriving (Eq, Show)
