@@ -2,10 +2,18 @@
 
 -- 1. Write the game Morra7 using StateT and IO. The state being accumulated is the score of the player and the computer AI opponent. To start, make the computer choose its play randomly. On exit, report the scores for the player and the computer, congratulating the winner.
 
+-- done.
+
+-- 2. Add a human vs. human mode to the game with interstitial screens between input prompts so the players can change out of the hot seat without seeing the other player’s answer.
+
+
+
 module Morra where
 
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Lazy
 import Data.List (intercalate)
 import System.Random
@@ -48,17 +56,31 @@ newPlayer b n c =
 defaultPlayer :: Bool -> Role
 defaultPlayer b = newPlayer b "Player" 'P'
 
-type Game = StateT Scores IO
+getNewPlayer :: Bool -> IO Role
+getNewPlayer b = do
+  putStrLn "Enter a player name: "
+  nm <- getLine
+  if not (null nm)
+  then return $ newPlayer b nm $ head nm
+  else getNewPlayer b
+
+type Game = StateT Scores
+              (ReaderT Option IO)
 
 flipCoin :: IO Bool
 flipCoin = randomIO
 
-newGame :: IO Scores
-newGame = do
+newGame :: Option -> IO Scores
+newGame RandComputer = do
   b <- flipCoin
   let player = defaultPlayer b
       comp = newComputer $ not b
   return ((player, 0), (comp, 0))
+newGame TwoPeople = do
+  b <- flipCoin
+  r1 <- getNewPlayer b
+  r2 <- getNewPlayer $ not b
+  return ((r1, 0), (r2, 0))
 
 getPlayerMove :: IO Int
 getPlayerMove = read <$> getLine
@@ -89,11 +111,20 @@ playerToShortName (Computer _ s) = s
 roleToShortName :: Role -> ShortName
 roleToShortName = playerToShortName . roleToPlayer
 
-morraPlay :: Role -> IO Int
+morraPlay :: Role -> Game Int
 morraPlay r = do
-  putStr $ show . getShortName . roleToShortName $  r
-  putStr $ ": "
-  solicitMove $ roleToPlayer r
+  move <- liftIO $ do
+    putStr $ show
+           . getShortName
+           . roleToShortName $ r
+    putStr $ ": "
+    solicitMove . roleToPlayer $ r
+  opt <- lift ask
+  case opt of
+    TwoPeople -> (liftIO $ replicateM_ 50
+                        $ putStrLn "")
+                 *> return move
+    _         -> return move
 
 isEven :: Role -> Bool
 isEven (Evens _) = True
@@ -118,8 +149,8 @@ printRoundWin p = do
 morraRound :: Game Score
 morraRound = do
   ((r1, s1), (r2, s2)) <- get
-  i1 <- liftIO $ morraPlay r1
-  i2 <- liftIO $ morraPlay r2
+  i1 <- morraPlay r1
+  i2 <- morraPlay r2
   let r = roundWinner (r1, i1) (r2, i2)
   liftIO . printRoundWin . roleToPlayer $ r
   if r == r1
@@ -151,7 +182,6 @@ explainRoles roles =
     explainRole (Evens p) =
       (getName . playerToName $ p) <> " is evens"
 
-
 introGame :: Game ()
 introGame = do
   ((r1, _), (r2, _)) <- get
@@ -168,7 +198,7 @@ introGame = do
 reportScore :: Score -> String
 reportScore (r, s) =
   (getName . playerToName . roleToPlayer $ r) <>
-  " scored " <> show s <> "points."
+  " scored " <> show s <> " points."
 
 congratulateWinner :: Role -> String
 congratulateWinner r =
@@ -201,8 +231,9 @@ playMorraGame = do
 
 playMorra :: Option -> IO ()
 playMorra opt = do
-  scores <- newGame
-  fst <$> runStateT playMorraGame scores
+  scores <- newGame opt
+  let rtas = runStateT playMorraGame scores
+  fst <$> runReaderT rtas opt
 
 data Option =
     TwoPeople
