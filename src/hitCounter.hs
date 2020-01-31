@@ -1,5 +1,3 @@
--- hitCounter.hs
-
 -- We’re going to provide an initial scaffold of a scotty application that counts hits to specific URIs. It also prefixes the keys with a prefix defined on app initialization, retrieved via command line arguments:
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -64,3 +62,8 @@ main = do
   let config = Config counter $ TL.pack prefixArg
       runR (ReaderT rmr) = rmr config
   scottyT 3000 runR app
+
+hello :: IO ()
+hello = do
+  putStrLn "hello"
+  putStrLn "goodbye"
